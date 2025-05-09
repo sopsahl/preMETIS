@@ -2,6 +2,9 @@ import networkx as nx
 import pymetis
 
 class preMETIS:
+    '''
+    
+    '''
     def __init__(self, graph: nx.Graph, degree_threshold=-1):
         
         self.original_graph = graph.copy()
@@ -10,17 +13,25 @@ class preMETIS:
         self.degree_threshold = degree_threshold
         
         self.reductions = {
-            'simplical_reduction' : 0,
+            'simplicial_reduction' : 0,
             'indistinguishable_reduction' : 0,
-            'twin_reduction' : 0
+            'twin_reduction' : 0,
+            'path_compression' : 0,
+            'degree_2_elimination' : 0,
+            'triangle_contraction' : 0
         }
 
+
+        self.reduction_mapping = {}
         self.ordering = []
 
         self.operations = {
-            'simplical_reduction' : 0,
+            'simplicial_reduction' : 0,
             'indistinguishable_reduction' : 0,
-            'twin_reduction' : 0
+            'twin_reduction' : 0,
+            'path_compression' : 0,
+            'degree_2_elimination' : 0,
+            'triangle_contraction' : 0
         }
 
 
@@ -36,31 +47,38 @@ class preMETIS:
         self.ordering.append(node)
 
 
-    def reduce_nodes(self, nodes, func, save_operations=False):
-        new_node = "reduced"
-        union = set()
+    def contract_nodes(self, nodes, func, prefix = ""):
+        '''
+        This reduces a set of nodes into 1
+        O(k * deg(v)) where k is number of nodes
+        '''
+
+        self.reductions[func] += len(nodes) - 1 # number of reductions
+
+        new_node = prefix
+        neighbors = set()
         for node in nodes:
             new_node += f"_{node}"
-            union |= set(self.graph.neighbors(node))
+            neighbors |= set(self.graph.neighbors(node))
 
-        if operations: # if not indistinguishible or twin reduction
-            self.operations += 
-        
+            self.operations[func] += self.graph.degree(node) # cost of checking neighbors and popping edge
+            self.graph.remove_node(node)
+
+        neighbors -= set(nodes)
         self.graph.add_node(new_node)
+        for n in neighbors:
+            self.graph.add_edge(new_node, n)
+        self.operations[func] += self.graph.degree(new_node) # cost of adding new_node
 
-        union = set()
+
+        self.reduction_mapping[new_node] = nodes
+        return new_node
         
 
-        neighbor_union = set(self.graph.neighbors(u)) | set(self.graph.neighbors(v)) | set(self.graph.neighbors(node))
-        neighbor_union -= {u, v, node}
-        for n in neighbor_union:
-            self.graph.add_edge(new_node, n)
-        return self.remove_node([u, v, node], depth + 1, 'triangle_contraction')
-
-    def simplical_reduction(self, degree_threshold=-1):
+    def simplicial_reduction(self, degree_threshold=-1):
         '''
         Removes nodes with a clique neigborhood
-        Iterates through all nodes once, so avoids potentially created cliques
+        Iterates through all nodes once, so misses potentially created cliques
         O(n * d^2), where d is the degree threshold
         '''
         removed = set()
@@ -72,83 +90,189 @@ class preMETIS:
             neighbors = list(self.graph.neighbors(node))
             is_clique = True
 
-            for i, u in enumerate(neighbors):
+            for u in neighbors: 
                 if u in removed:
                     continue
-                for v in neighbors[i+1:]:
-                    self.operations['simplical_reduction'] += 1
-                    if v not in removed and not self.graph.has_edge(u, v):
-                        is_clique = False
-                        break
 
-                if not is_clique:
-                    break
+                self.operations['simplicial_reduction'] += max(self.graph.degree(node), self.graph.degree(u)) # cost of comparing neighbors
+                if len(set(self.graph.neighbors(node)) & set(self.graph.neighbors(u))) == len(neighbors) - 1:
+                    continue
+
+                is_clique = False
+                break
                             
             if is_clique:
                 removed.add(node)
-                self.eliminate_node(node, 'simplical_reduction')
+                self.eliminate_node(node, 'simplicial_reduction')
 
-    def indistinguishable_reduction(self, depth=0):
+    def indistinguishable_reduction(self):
+        '''
+        Reduces node pairs with an identical closed neighborhood
+        O(m + m*deg(v))
+        '''
         hashes = { 
-            node : sum((int) neighbor for neighbor in self.graph.neighbors(node))
+            node : sum(hash(n) for n in self.graph.neighbors(node) | {node})
             for node in self.graph.nodes()
-                  
             }
+        
+        self.operations['indistinguishable_reduction'] += 2*len(self.graph.edges) # cost of creating hashes
+        
+        edges = list(self.graph.edges())
+        reduced = {}
 
+        for (u, v) in edges:
+           
+            if hashes[u] == hashes[v]: # worth comparing now
+                u = _find_lowest_reduction(reduced, u)
+                v = _find_lowest_reduction(reduced, v)
                 
-        self.operations += len(self.graph.edges) # cost of creating hashes
+                self.operations['indistinguishable_reduction'] += max(self.graph.degree(u), self.graph.degree(v)) # cost of comparing neighbors
+                
+                if set(self.graph.neighbors(u)) | {u} == set(self.graph.neighbors(v)) | {v}:
+                    new_node = self.contract_nodes([u, v], "indistinguishable_reduction")
+                    reduced[u] = new_node
+                    reduced[v] = new_node
+                
+            else: self.operations['indistinguishable_reduction'] += 1 # cost of iterating
 
-        for u, v in self.graph.edges:
-            if self.graph.neighbors(u) | {u} == self.graph.neighbors(v) | {v}:
-                self.remove_node([node], depth + 1, 'indistinguishable_reduction')
-        if neighbors in twins:
-            return self.remove_node([node], depth + 1, 'indistinguishable_reduction')
-        twins[node] = node
 
-    def twin_reduction(self, depth=0):
-        twins = {}
+    def twin_reduction(self):
+        '''
+        Reduces node pairs with an identical open neighborhood
+        O(m + m*deg(v))
+        '''
+        hashes = { 
+            node : sum(hash(n) for n in self.graph.neighbors(node))
+            for node in self.graph.nodes()
+            }
+        
+        self.operations['twin_reduction'] += 2*len(self.graph.edges) # cost of creating hashes
+        
+        edges = list(self.graph.edges())
+        reduced = {}
+
+        for (u, v) in edges:
+           
+            if hashes[u] == hashes[v]: # worth comparing now
+                u = _find_lowest_reduction(reduced, u)
+                v = _find_lowest_reduction(reduced, v)
+                
+                self.operations['twin_reduction'] += max(self.graph.degree(u), self.graph.degree(v)) # cost of comparing neighbors
+                
+                if set(self.graph.neighbors(u)) == set(self.graph.neighbors(v)):
+                    new_node = self.contract_nodes([u, v], "twin_reduction")
+                    reduced[u] = new_node
+                    reduced[v] = new_node
+                
+            else: self.operations['twin_reduction'] += 1 # cost of iterating
+
+    def path_compression(self):
+        '''
+        Reduces all paths of degree-2 nodes to one node
+        O(n*deg(v))
+        '''
+
+        self.operations['path_compression'] += self.graph.number_of_nodes() # cost of iterating through nodes
+        
+        reduced = set()
         for node in list(self.graph.nodes()):
-            neighbors = frozenset(self.graph.neighbors(node))
-            if neighbors in twins:
-                return self.remove_node([node], depth + 1, 'twin_reduction')
-            twins[neighbors] = node
-
-    def path_compression(self, depth=0):
-        for node in list(self.graph.nodes()):
+            if node in reduced: # already compressed
+                continue
+            
             if self.graph.degree(node) != 2:
                 continue
-            neighbors = list(self.graph.neighbors(node))
-            if self.graph.has_edge(neighbors[0], neighbors[1]):
-                continue
-            self.graph.add_edge(neighbors[0], neighbors[1])
-            return self.remove_node([node], depth + 1, 'path_compression')
 
-    def degree_2_elimination(self, depth=0):
+            to_reduce = [node]
+
+            neighbors = list(self.graph.neighbors(node))
+            u, v = neighbors[0], neighbors[1]
+
+            while True: # looks for all elements of degree-2 in the path
+                if self.graph.degree(u) == 2 and u not in to_reduce:
+                    to_reduce.append(u)
+                    neighbors = list(self.graph.neighbors(u))
+                    u = neighbors[0] if neighbors[1] in to_reduce else neighbors[1]
+                    continue
+                if self.graph.degree(v) == 2 and v not in to_reduce:
+                    to_reduce.append(v)
+                    neighbors = list(self.graph.neighbors(v))
+                    v = neighbors[0] if neighbors[1] in to_reduce else neighbors[1]
+                    continue
+
+                break
+
+            if len(to_reduce) == 1:
+                continue
+
+            reduced.update(set(to_reduce)) 
+            self.contract_nodes(to_reduce, 'path_compression', prefix="path_compression")
+
+    def degree_2_elimination(self):
+        '''
+        Eliminates all degree-2 nodes from the graph 
+        This is an approximate reduction
+        O(n) for iterating through the nodes
+        '''
+
+        self.operations['degree_2_elimination'] += self.graph.number_of_nodes() # cost of iterating through nodes
+
         for node in list(self.graph.nodes()):
             if self.graph.degree(node) == 2:
                 neighbors = list(self.graph.neighbors(node))
                 if not self.graph.has_edge(neighbors[0], neighbors[1]):
                     self.graph.add_edge(neighbors[0], neighbors[1])
-                return self.remove_node([node], depth + 1, 'degree_2_elimination')
+                self.eliminate_node(node, 'degree_2_elimination')
 
-    def triangle_contraction(self, depth=0):
+    def triangle_contraction(self):
+        '''
+        Reduces all degree-3 neighbors
+        This is an approximate reduction
+        O(m) for iterating through all the edges
+        '''
+
+
+        visited = {}
         
         for node in list(self.graph.nodes()):
-            neighbors = list(self.graph.neighbors(node))
-            if len(neighbors) < 2:
+
+            if node in visited or self.graph.degree(node) != 3: continue
+
+            if self.graph.degree(node) != 3: continue
+
+            to_reduce = []
+            stack = [node]
+
+            while stack:
+                x = stack.pop()
+                if x in visited or self.graph.degree(x) != 3:
+                    continue
+
+                visited.add(x)
+                to_reduce.append(x)
+                neighbors = set(self.graph.neighbors(x))
+
+                self.operations['triangle_contraction'] += 3 
+
+                for y in neighbors:
+                    if y in visited or self.graph.degree(y) != 3:
+                        continue
+                    common_neighbors = neighbors & set(self.graph.neighbors(y))
+                    if len(common_neighbors) >= 1:
+                        visited.add(y)
+                        to_reduce.append(y)
+                        for a in common_neighbors:
+                            for z in self.graph.neighbors(y):
+                                self.operations['triangle_contraction'] += 1
+                                if z in visited or z in to_reduce:
+                                    continue
+                                if self.graph.degree(z) == 3 and a in self.graph.neighbors(z):
+                                    stack.append(z) # recurse on z
+                                
+
+            if len(to_reduce) == 1:
                 continue
-            for i in range(len(neighbors)):
-                for j in range(i + 1, len(neighbors)):
-                    u, v = neighbors[i], neighbors[j]
-                    if self.graph.has_edge(u, v):
-                        # Contract triangle into a new node
-                        new_node = f"tri_{u}_{v}_{node}"
-                        self.graph.add_node(new_node)
-                        neighbor_union = set(self.graph.neighbors(u)) | set(self.graph.neighbors(v)) | set(self.graph.neighbors(node))
-                        neighbor_union -= {u, v, node}
-                        for n in neighbor_union:
-                            self.graph.add_edge(new_node, n)
-                        return self.remove_node([u, v, node], depth + 1, 'triangle_contraction')
+
+            self.contract_nodes(to_reduce, 'triangle_contraction', prefix="triangle_contraction")
 
     def summary(self):
         return {
@@ -156,3 +280,11 @@ class preMETIS:
             'reduced_nodes': self.graph.number_of_nodes(),
             'reduction_steps': self.reductions
         }
+    
+
+def _find_lowest_reduction(reduced_set, node):
+    while True:
+        if node in reduced_set: 
+            node = reduced_set[node]
+            continue
+        return node
