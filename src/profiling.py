@@ -4,18 +4,42 @@ import time
 from copy import deepcopy
 
 from .preMETIS import preMETIS
-from .tests import TESTS
 
-def profile(graph, number_of_partitions):
+def run(graph:nx.Graph, tests:list[preMETIS]):
+    results = {}
+    for test in tests:
+        print("***********************************************************")
+        
+        print(f"Running {test} test:")
+        print("Transforming the graph...")
+        test = test(graph)
+        print(f"\tTransformation done. {test.total_reductions()} total reductions made.")
+        
+        print("Running METIS...")
+        runtime, ordering, idx_mapping = _run_METIS(test.graph)
+        print(f'METIS done. Process took {runtime} seconds to run.')
+        
+        print("Estimating fill-in...")
+        ordering = test.get_ordering(ordering, idx_mapping)
+        fill_in = _estimate_fill_in(graph, ordering)
+        print(f'Fill-in done. {fill_in} fill-ins required.')
+        
+        results[str(test)] = {
+            "METIS Runtime" : runtime,
+            "Nonzero Fill-in" : fill_in,
+            "Reductions" : test.reductions,
+            "Total Reductions" : test.total_reductions(),
+            "Original Nodes": test.original_graph.number_of_nodes(),
+            "Operations" : test.operations,
+            "Total Operations" : test.total_operations(),
+        }
 
-    def graph_to_metis_format(g: nx.Graph):
-        node_mapping = {node: i for i, node in enumerate(g.nodes())}
-        adj_list = [[node_mapping[nbr] for nbr in g.neighbors(node)] for node in g.nodes()]
-        return adj_list
+        print(f"All testing for {test} done.")
+        print("***********************************************************")
     
+    return results
 
-    def estimate_fill_in(graph: nx.Graph, elimination_order: list):
-        """Estimate fill-in edges created during elimination."""
+def _estimate_fill_in(graph: nx.Graph, elimination_order: list):
         g = graph.copy()
         fill_in = 0
         for node in elimination_order:
@@ -30,50 +54,22 @@ def profile(graph, number_of_partitions):
             g.remove_node(node)
         return fill_in
 
-    # Step 1: Original graph METIS
-    original_graph = deepcopy(graph)
-    original_adj = graph_to_metis_format(original_graph)
+def _run_METIS(graph:nx.Graph):
+    adj_list, idx_mapping = _graph_to_adj_list(graph)
 
     start = time.time()
-    _, original_ordering = pymetis.nested_dissection(graph_to_metis_format(original_graph))
-    original_fill = estimate_fill_in(original_graph, original_ordering)
-    original_runtime = time.time() - start
+    _, ordering = pymetis.nested_dissection(adj_list)
+    runtime = time.time() - start
 
-    # Estimate fill-in from natural elimination order
-    original_fill = estimate_fill_in(original_graph, list(original_graph.nodes()))
+    return runtime, ordering, idx_mapping
 
-    # Step 2: Reduced graph METIS
-    reduced_instance = reducer(graph)
-    reduced_instance.simplicial_reduction()
-    reduced_instance.indistinguishable_reduction()
-    reduced_instance.twin_reduction()
-    reduced_instance.path_compression()
-    reduced_instance.degree_2_elimination()
-    reduced_instance.triangle_contraction()
+def _graph_to_adj_list(g: nx.Graph):
+    node_mapping, idx_mapping = {}, {}
+    adj_list = []
+    for idx, node in enumerate(g.nodes()):
+        node_mapping[node] = idx
+        idx_mapping[idx] = node
 
-    reduced_graph = reduced_instance.graph
-    reduced_adj = graph_to_metis_format(reduced_graph)
-
-    start = time.time()
-    _, reduced_partition = pymetis.part_graph(k, adjacency=reduced_adj)
-    reduced_runtime = time.time() - start
-
-    reduced_fill = estimate_fill_in(reduced_graph, list(reduced_graph.nodes()))
-
-    # Summary
-    return {
-        "original": {
-            "runtime": original_runtime,
-            "fill_in": original_fill,
-            "nodes": len(original_graph),
-            "edges": original_graph.number_of_edges()
-        },
-        "reduced": {
-            "runtime": reduced_runtime,
-            "fill_in": reduced_fill,
-            "nodes": len(reduced_graph),
-            "edges": reduced_graph.number_of_edges()
-        },
-        "reduction_summary": reduced_instance.summary()
-    }
-
+    adj_list = [[node_mapping[nbr] for nbr in g.neighbors(idx_mapping[idx])] for idx in range(g.number_of_nodes())]
+   
+    return adj_list, idx_mapping
