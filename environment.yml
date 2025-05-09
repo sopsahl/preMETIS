@@ -3,4 +3,6 @@ dependencies:
   - numpy
   - pandas
   - matplotlib
-  
+  - pip:
+    - networkx
+    - pymetis
