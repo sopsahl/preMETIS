@@ -1,18 +1,25 @@
 import networkx as nx
-import pymetis
 
 class preMETIS:
-    '''
-    
-    '''
-    def __init__(self, graph: nx.Graph, degree_threshold=-1):
+
+    def transform(self):
+        raise NotImplementedError
+
+    def __init__(self, graph: nx.Graph):
         
         self.original_graph = graph.copy()
         self.graph = graph
-
-        self.degree_threshold = degree_threshold
         
         self.reductions = {
+            'simplicial_reduction' : 0,
+            'indistinguishable_reduction' : 0,
+            'twin_reduction' : 0,
+            'path_compression' : 0,
+            'degree_2_elimination' : 0,
+            'triangle_contraction' : 0
+        }
+
+        self.operations = {
             'simplicial_reduction' : 0,
             'indistinguishable_reduction' : 0,
             'twin_reduction' : 0,
@@ -25,14 +32,8 @@ class preMETIS:
         self.reduction_mapping = {}
         self.ordering = []
 
-        self.operations = {
-            'simplicial_reduction' : 0,
-            'indistinguishable_reduction' : 0,
-            'twin_reduction' : 0,
-            'path_compression' : 0,
-            'degree_2_elimination' : 0,
-            'triangle_contraction' : 0
-        }
+        # Run the reductions specified in self.transform()
+        self.transform()
 
 
     def eliminate_node(self, node, func):
@@ -87,7 +88,7 @@ class preMETIS:
             if degree_threshold != -1 and self.graph.degree(node) > degree_threshold:
                 continue
 
-            neighbors = list(self.graph.neighbors(node))
+            neighbors = set(self.graph.neighbors(node))
             is_clique = True
 
             for u in neighbors: 
@@ -95,7 +96,7 @@ class preMETIS:
                     continue
 
                 self.operations['simplicial_reduction'] += max(self.graph.degree(node), self.graph.degree(u)) # cost of comparing neighbors
-                if len(set(self.graph.neighbors(node)) & set(self.graph.neighbors(u))) == len(neighbors) - 1:
+                if len(neighbors & set(self.graph.neighbors(u))) == len(neighbors) - 1:
                     continue
 
                 is_clique = False
@@ -237,7 +238,6 @@ class preMETIS:
 
             if node in visited or self.graph.degree(node) != 3: continue
 
-            if self.graph.degree(node) != 3: continue
 
             to_reduce = []
             stack = [node]
@@ -274,13 +274,23 @@ class preMETIS:
 
             self.contract_nodes(to_reduce, 'triangle_contraction', prefix="triangle_contraction")
 
+    
+
     def summary(self):
         return {
             'original_nodes': self.original_graph.number_of_nodes(),
             'reduced_nodes': self.graph.number_of_nodes(),
-            'reduction_steps': self.reductions
+            'reduction_steps': self.reductions,
+            'operations': self.operations
         }
+    # TODO
+
+    def __repr__(self):
+        return self.__class__.__name__
     
+
+    
+
 
 def _find_lowest_reduction(reduced_set, node):
     while True:
