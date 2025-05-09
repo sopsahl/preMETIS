@@ -1,40 +1,40 @@
 import networkx as nx
 import pymetis
 import time
-from copy import deepcopy
 
 from .preMETIS import preMETIS
 
-def run(graph:nx.Graph, tests:list[preMETIS]):
+def profile(graph:nx.Graph, tests:list[preMETIS]):
     results = {}
     for test in tests:
         print("***********************************************************")
         
         print(f"Running {test} test:")
         print("Transforming the graph...")
-        test = test(graph)
-        print(f"\tTransformation done. {test.total_reductions()} total reductions made.")
+        test_graph = test(graph)
+        print(f"\tTransformation done. {test_graph.total_reductions()} total reductions made.")
         
         print("Running METIS...")
-        runtime, ordering, idx_mapping = _run_METIS(test.graph)
+        runtime, ordering, idx_mapping = _run_METIS(test_graph.graph)
         print(f'METIS done. Process took {runtime} seconds to run.')
         
         print("Estimating fill-in...")
-        ordering = test.get_ordering(ordering, idx_mapping)
+        ordering = test_graph.get_ordering(ordering, idx_mapping)
         fill_in = _estimate_fill_in(graph, ordering)
         print(f'Fill-in done. {fill_in} fill-ins required.')
         
-        results[str(test)] = {
+        results[str(test_graph)] = {
             "METIS Runtime" : runtime,
             "Nonzero Fill-in" : fill_in,
-            "Reductions" : test.reductions,
-            "Total Reductions" : test.total_reductions(),
-            "Original Nodes": test.original_graph.number_of_nodes(),
-            "Operations" : test.operations,
-            "Total Operations" : test.total_operations(),
+            "Reductions" : test_graph.reductions,
+            "Total Reductions" : test_graph.total_reductions(),
+            "Original Nodes": test_graph.total_nodes,
+            "Original NNZ" : test_graph.total_edges,
+            "Operations" : test_graph.operations,
+            "Total Operations" : test_graph.total_operations(),
         }
 
-        print(f"All testing for {test} done.")
+        print(f"All testing for {test_graph} done.")
         print("***********************************************************")
     
     return results
@@ -65,7 +65,7 @@ def _run_METIS(graph:nx.Graph):
 
 def _graph_to_adj_list(g: nx.Graph):
     node_mapping, idx_mapping = {}, {}
-    adj_list = []
+
     for idx, node in enumerate(g.nodes()):
         node_mapping[node] = idx
         idx_mapping[idx] = node

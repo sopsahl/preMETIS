@@ -82,8 +82,8 @@ class preMETIS:
 
     def simplicial_reduction(self, degree_threshold=-1):
         '''
-        Removes nodes with a clique neigborhood
-        Iterates through all nodes once, so misses potentially created cliques
+        Removes nodes with a clique neighborhood.
+        Iterates through all nodes once, so misses potentially created cliques.
         O(n * d^2), where d is the degree threshold
         '''
         removed = set()
@@ -92,14 +92,15 @@ class preMETIS:
             if degree_threshold != -1 and self.graph.degree(node) > degree_threshold:
                 continue
 
-            neighbors = self.graph.neighbors(node)
+            neighbors = list(self.graph.neighbors(node))
             deg = len(neighbors)
 
             self.operations['simplicial_reduction'] += deg * (deg - 1) // 2
-                            
+
             if self.graph.subgraph(neighbors).number_of_edges() == deg * (deg - 1) // 2:
                 removed.add(node)
                 self.eliminate_node(node, 'simplicial_reduction')
+
 
     def indistinguishable_reduction(self):
         '''
