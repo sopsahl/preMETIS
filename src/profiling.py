@@ -3,6 +3,8 @@ import pymetis
 import time
 from sksparse.cholmod import cholesky
 import scipy.sparse as sp
+import random
+import gc
 
 
 
@@ -32,7 +34,7 @@ def profile(graph:nx.Graph, test:preMETIS):
     print(f"All testing for {test_graph} done.")
     print("***********************************************************")
     
-    return {
+    output = {
         "METIS Runtime" : avg_runtime,
         "METIS runtimes" : runtimes,
         "Nonzero Fill-in" : fill_in,
@@ -44,6 +46,31 @@ def profile(graph:nx.Graph, test:preMETIS):
         "Total Operations" : test_graph.total_operations(),
     }
 
+    del test_graph
+    del ordering
+    gc.collect()
+
+    return output
+
+
+def _test_fillin_random_permutation(graph: nx.Graph):
+    print("Testing Default fill-in ...")
+    fill_ins = []
+
+    nodes = list(graph.nodes())
+
+    for n in range(N):
+        random.seed(n)
+        permuted_nodes = nodes[:] 
+        random.shuffle(permuted_nodes)
+        fill_ins.append(_estimate_fill_in_cholesky(graph, permuted_nodes))
+
+    avg_fill_in = sum(fill_ins) / N
+
+    print(f'\tFill-in done. {avg_fill_in:.2f} fill-ins required.')
+    return avg_fill_in, fill_ins
+
+    
 
 def _estimate_fill_in_cholesky(graph: nx.Graph, elimination_order: list):
     laplacian = nx.laplacian_matrix(graph, nodelist=elimination_order)    
@@ -51,7 +78,7 @@ def _estimate_fill_in_cholesky(graph: nx.Graph, elimination_order: list):
     
     # laplacian = laplacian.tocsc()
 
-    factor = cholesky(laplacian, beta=0, ordering_method="natural") 
+    factor = cholesky(laplacian, beta=0) 
     L = factor.L()
 
     return L.nnz - laplacian.nnz

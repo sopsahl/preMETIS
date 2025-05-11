@@ -54,7 +54,7 @@ BASE_TESTS = [
 TEST_NAME_MAP = {cls.__name__: cls for cls in BASE_TESTS}
 
 ROAD_NETWORKS = {
-    'roadNet-TX': 'roadNet-TX.txt',
+    # 'roadNet-TX': 'roadNet-TX.txt',
     'roadNet-CA': 'roadNet-CA.txt',
     'roadNet-PA': 'roadNet-PA.txt'
 }

@@ -287,7 +287,8 @@ class preMETIS:
         Returns the final elimination ordering for the graph
         '''
         final_ordering = []
-        
+        self.ordering_visited = set()
+
         for node in self.ordering:
             final_ordering += self._get_node_reduction(node)
 
@@ -296,7 +297,6 @@ class preMETIS:
 
         return final_ordering
     
-    @lru_cache(maxsize=None)
     def _get_node_reduction(self, node):
 
         if node in self.reduction_mapping: # it was reduced

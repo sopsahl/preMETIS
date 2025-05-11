@@ -4,6 +4,7 @@ import json
 import gzip
 import shutil
 import urllib.request
+import gc 
 
 from .profiling import profile
 
@@ -25,11 +26,15 @@ def run(workload, tests):
         if not nx.is_connected(graph):
             largest_cc = max(nx.connected_components(graph), key=len)
             graph = graph.subgraph(largest_cc).copy()
-            
+
         for test in tests:
             results = profile(graph, test)
             _save_results(results, name, test.__name__)
         print(f"All tests for {name} run")
+
+        del graph
+        gc.collect()
+        
 
 def _save_results(results, graph_name, test_name):
     os.makedirs(OUTPUT_DIR, exist_ok=True)
