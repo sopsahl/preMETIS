@@ -1,9 +1,16 @@
 name: preMETIS
+channels:
+  - conda-forge  
+  - defaults  
 dependencies:
   - numpy
   - pandas
   - matplotlib
+  - pip
+  - python=3.12
+  - scipy
+  - suitesparse  
+  - scikit-sparse  
   - pip:
-    - networkx
-    - pymetis
-    - argparse
+      - networkx
+      - pymetis
