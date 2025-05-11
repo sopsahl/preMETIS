@@ -2,7 +2,8 @@ import networkx as nx
 import pymetis
 import time
 from sksparse.cholmod import cholesky
-from scipy.sparse import csr_matrix
+import scipy.sparse as sp
+
 
 
 from .preMETIS import preMETIS
@@ -19,12 +20,12 @@ def profile(graph:nx.Graph, test:preMETIS):
     
     print("Running METIS...")
     avg_runtime, ordering, idx_mapping, runtimes= _run_METIS(test_graph.graph)
-    print(f'METIS done. Process took {avg_runtime} seconds to run.')
+    print(f'\tMETIS done. Process took {avg_runtime} seconds to run.')
     
     print("Estimating fill-in...")
     ordering = test_graph.get_ordering(ordering, idx_mapping)
     fill_in = _estimate_fill_in_cholesky(graph, ordering)
-    print(f'Fill-in done. {fill_in} fill-ins required.')
+    print(f'\tFill-in done. {fill_in} fill-ins required.')
 
     print(f"All testing for {test_graph} done.")
     print("***********************************************************")
@@ -42,31 +43,15 @@ def profile(graph:nx.Graph, test:preMETIS):
     }
 
 
-def _estimate_fill_in(graph: nx.Graph, elimination_order: list):
-    g = graph.copy()
-    fill_in = 0
-    for node in elimination_order:
-        if node not in g:
-            continue
-        neighbors = list(g.neighbors(node))
-        for i in range(len(neighbors)):
-            for j in range(i + 1, len(neighbors)):
-                if not g.has_edge(neighbors[i], neighbors[j]):
-                    g.add_edge(neighbors[i], neighbors[j])
-                    fill_in += 1
-        g.remove_node(node)
-    return fill_in
-
 def _estimate_fill_in_cholesky(graph: nx.Graph, elimination_order: list):
+    laplacian = nx.laplacian_matrix(graph, nodelist=elimination_order)    
+    laplacian += 1e-5 * sp.eye(laplacian.shape[0])  # Regularization
+    laplacian = laplacian.tocsc()
 
-    adj_matrix = nx.adjacency_matrix(graph)
-
-    A_perm = adj_matrix[elimination_order, :][:, elimination_order]
-
-    factor = cholesky(A_perm, beta=0) 
+    factor = cholesky(laplacian, beta=0) 
     L = factor.L()
 
-    return L.nnz - adj_matrix.nnz
+    return L.nnz - laplacian.nnz
 
 
 def _run_METIS(graph:nx.Graph):

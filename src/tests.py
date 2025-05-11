@@ -25,6 +25,7 @@ def run(workload, tests):
         if not nx.is_connected(graph):
             largest_cc = max(nx.connected_components(graph), key=len)
             graph = graph.subgraph(largest_cc).copy()
+            
         for test in tests:
             results = profile(graph, test)
             _save_results(results, name, test.__name__)
