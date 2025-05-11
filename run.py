@@ -45,7 +45,6 @@ class METIS(preMETIS):
 
 BASE_TESTS = [
     METIS,
-    # SITDTr,
     SITP12,
     SIDTr12,
     SITD6, 

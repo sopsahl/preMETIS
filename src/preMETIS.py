@@ -108,7 +108,7 @@ class preMETIS:
         O(m + m*deg(v))
         '''
         hashes = { 
-            node : sum(hash(n) for n in self.graph.neighbors(node) | {node})
+            node : sum(hash(n) for n in set(self.graph.neighbors(node)) | {node})
             for node in self.graph.nodes()
             }
         
@@ -297,7 +297,7 @@ class preMETIS:
             ordering = []
             
             for child in self._node_reduction_order(node, final_ordering):
-                ordering += self._get_node_reduction(child)
+                ordering += self._get_node_reduction(child, final_ordering)
             return ordering
         
         return [node]
@@ -306,7 +306,7 @@ class preMETIS:
         nodes = self.reduction_mapping[node]
         if node in self.path_compression_nodes:
             return nodes if self.path_compression_nodes[node][1] is None \
-                or self._get_node_reduction(self.path_compression_nodes[node][1])[0] in final_ordering \
+                or self._get_node_reduction(self.path_compression_nodes[node][1], final_ordering)[0] in final_ordering \
                 else nodes[::-1]
         return nodes
 

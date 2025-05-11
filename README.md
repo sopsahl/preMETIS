@@ -22,7 +22,7 @@ python run.py --workload <workload_type> --tests <test_names>
 `<workload_type>` can be road or social (or any custom datasets you define).
 
 
-`<test_label>` is a label used to name your result files (e.g., base).
+`<test_names>` is a set of tests to run. If all, use `all`.
 
 Example:
 
