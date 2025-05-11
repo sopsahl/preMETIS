@@ -240,7 +240,7 @@ class preMETIS:
         '''
 
 
-        visited = {}
+        visited = set()
         
         for node in list(self.graph.nodes()):
 

@@ -48,5 +48,6 @@ The graph datasets can be automatically downloaded from the [SNAP](http://snap.s
 ## References
 [1] Ost, L., Schulz, C., & Strash, D. (2020). Engineering Data Reduction for Nested Dissection (No.
 arXiv:2004.11315). arXiv. https://doi.org/10.48550/arXiv.2004.11315
+
 [2] J. Leskovec and A. Krevl. SNAP Datasets: Stanford large network dataset collection.
 http://snap.stanford.edu/data, 2014.
