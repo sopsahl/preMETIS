@@ -48,9 +48,10 @@ def profile(graph:nx.Graph, test:preMETIS):
 def _estimate_fill_in_cholesky(graph: nx.Graph, elimination_order: list):
     laplacian = nx.laplacian_matrix(graph, nodelist=elimination_order)    
     laplacian += 1e-5 * sp.eye(laplacian.shape[0])  # Regularization
-    laplacian = laplacian.tocsc()
+    
+    # laplacian = laplacian.tocsc()
 
-    factor = cholesky(laplacian, beta=0) 
+    factor = cholesky(laplacian, beta=0, ordering_method="natural") 
     L = factor.L()
 
     return L.nnz - laplacian.nnz

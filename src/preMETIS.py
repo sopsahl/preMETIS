@@ -286,8 +286,10 @@ class preMETIS:
         '''
         Returns the final elimination ordering for the graph
         '''
-        final_ordering = self.ordering.copy()
-        self.ordering_visited = set(final_ordering)
+        final_ordering = []
+        
+        for node in self.ordering:
+            final_ordering += self._get_node_reduction(node)
 
         for node_idx in metis_ordering:
             final_ordering += self._get_node_reduction(idx_mapping[node_idx])
