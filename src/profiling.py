@@ -23,7 +23,9 @@ def profile(graph:nx.Graph, test:preMETIS):
     print(f'\tMETIS done. Process took {avg_runtime} seconds to run.')
     
     print("Estimating fill-in...")
+    print("\tGenerating true ordering ...")
     ordering = test_graph.get_ordering(ordering, idx_mapping)
+    print("\tPerforming factorization ...")
     fill_in = _estimate_fill_in_cholesky(graph, ordering)
     print(f'\tFill-in done. {fill_in} fill-ins required.')
 

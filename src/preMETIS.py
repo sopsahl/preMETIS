@@ -1,4 +1,6 @@
 import networkx as nx
+from functools import lru_cache
+
 
 class preMETIS:
 
@@ -285,28 +287,31 @@ class preMETIS:
         Returns the final elimination ordering for the graph
         '''
         final_ordering = self.ordering.copy()
-        
+        self.ordering_visited = set(final_ordering)
+
         for node_idx in metis_ordering:
-            final_ordering += self._get_node_reduction(idx_mapping[node_idx], final_ordering)
+            final_ordering += self._get_node_reduction(idx_mapping[node_idx])
 
         return final_ordering
     
-    def _get_node_reduction(self, node, final_ordering):
+    @lru_cache(maxsize=None)
+    def _get_node_reduction(self, node):
 
         if node in self.reduction_mapping: # it was reduced
             ordering = []
             
-            for child in self._node_reduction_order(node, final_ordering):
-                ordering += self._get_node_reduction(child, final_ordering)
+            for child in self._node_reduction_order(node):
+                ordering += self._get_node_reduction(child)
             return ordering
         
+        self.ordering_visited.add(node)
         return [node]
     
-    def _node_reduction_order(self, node, final_ordering):
+    def _node_reduction_order(self, node):
         nodes = self.reduction_mapping[node]
         if node in self.path_compression_nodes:
-            return nodes if self.path_compression_nodes[node][1] is None \
-                or self._get_node_reduction(self.path_compression_nodes[node][1], final_ordering)[0] in final_ordering \
+            return nodes if self.path_compression_nodes[node][0] is not None \
+                and self._get_node_reduction(self.path_compression_nodes[node][0])[0] in self.ordering_visited \
                 else nodes[::-1]
         return nodes
 
