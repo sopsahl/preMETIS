@@ -11,6 +11,8 @@ dependencies:
   - scipy
   - suitesparse  
   - scikit-sparse  
+  - seaborn
   - pip:
       - networkx
       - pymetis
+      - ipykernel

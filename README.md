@@ -29,7 +29,9 @@ Example:
 python run.py  --tests SITDTr SITP12 
 ```
 
-This command will run the `SITDTr` and `SITP12` tests on the `road` workload..
+This command will run the `SITDTr` and `SITP12` tests on the `road` workload.
+
+3. Visualize the results by running the `visulization.ipynb` notebook.
 
 ## Graph Data:
 
@@ -43,6 +45,8 @@ The graph datasets can be automatically downloaded from the [SNAP](http://snap.s
 `data/`: Stores the downloaded test graphs.
 
 `run.py`: The main script for running the tests.
+
+`visualization.ipynb` : A notebook for visualizing generated results.
 
 ## References
 [1] Ost, L., Schulz, C., & Strash, D. (2020). Engineering Data Reduction for Nested Dissection (No.
