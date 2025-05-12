@@ -16,10 +16,9 @@ conda activate preMETIS
 2. Run the profiling with your selected network data. The command is structured as follows:
 
 ```bash
-python run.py --workload <workload_type> --tests <test_names>
+python run.py  --tests <test_names>
 ```
 
-`<workload_type>` can be road or social (or any custom datasets you define).
 
 
 `<test_names>` is a set of tests to run. If all, use `all`.
@@ -27,14 +26,14 @@ python run.py --workload <workload_type> --tests <test_names>
 Example:
 
 ```bash
-python run.py --workload road --tests SITDTr SITP12 
+python run.py  --tests SITDTr SITP12 
 ```
 
 This command will run the `SITDTr` and `SITP12` tests on the `road` workload..
 
 ## Graph Data:
 
-The graph datasets can be automatically downloaded from the [SNAP](http://snap.stanford.edu/data) website [2]. When running the profiling, the code will download the required datasets if they are not already available locally. The datasets include road networks like roadNet-TX, roadNet-CA, roadNet-PA as well as social networks like email-Enron, ca-GrQc, and com-amazon.
+The graph datasets can be automatically downloaded from the [SNAP](http://snap.stanford.edu/data) website [2]. When running the profiling, the code will download the required datasets if they are not already available locally. The datasets include road networks like roadNet-TX, roadNet-CA, and roadNet-PA.
 
 ## Directory Structure
 `src/`: Contains the implementation of the preMETIS algorithm. Also contains helper scripts for graph manipulation, profiling, and result handling.
