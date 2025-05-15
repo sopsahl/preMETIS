@@ -1,5 +1,6 @@
 import networkx as nx
 from functools import lru_cache
+from collections import defaultdict
 
 
 class preMETIS:
@@ -116,23 +117,21 @@ class preMETIS:
         
         self.operations['indistinguishable_reduction'] += 2*len(self.graph.edges) # cost of creating hashes
         
-        edges = list(self.graph.edges())
-        reduced = {}
+        to_reduce = defaultdict(set)
 
-        for (u, v) in edges:
+        for (u, v) in list(self.graph.edges()):
            
             if hashes[u] == hashes[v]: # worth comparing now
-                u = self._find_lowest_reduction(reduced, u)
-                v = self._find_lowest_reduction(reduced, v)
                 
                 self.operations['indistinguishable_reduction'] += max(self.graph.degree(u), self.graph.degree(v)) # cost of comparing neighbors
                 
                 if set(self.graph.neighbors(u)) | {u} == set(self.graph.neighbors(v)) | {v}:
-                    new_node = self.contract_nodes([u, v], "indistinguishable_reduction")
-                    reduced[u] = new_node
-                    reduced[v] = new_node
+                    to_reduce[hashes[u]].update({u, v})
                 
             else: self.operations['indistinguishable_reduction'] += 1 # cost of iterating
+        
+        for reduce_group in to_reduce.values():
+            self.contract_nodes(list(reduce_group), "indistinguishable_reduction")
 
 
     def twin_reduction(self):
@@ -147,23 +146,33 @@ class preMETIS:
         
         self.operations['twin_reduction'] += 2*len(self.graph.edges) # cost of creating hashes
         
-        edges = list(self.graph.edges())
-        reduced = {}
+        groups = defaultdict(set)
+        for node in self.graph.nodes():
+            key = (self.graph.degree(node), hashes[node])
+            groups[key].add(node)
+        
+        self.operations['twin_reduction'] += 2*len(self.graph.nodes)
+        all_reductions = []
 
-        for (u, v) in edges:
-           
-            if hashes[u] == hashes[v]: # worth comparing now
-                u = self._find_lowest_reduction(reduced, u)
-                v = self._find_lowest_reduction(reduced, v)
-                
-                self.operations['twin_reduction'] += max(self.graph.degree(u), self.graph.degree(v)) # cost of comparing neighbors
-                
-                if set(self.graph.neighbors(u)) == set(self.graph.neighbors(v)):
-                    new_node = self.contract_nodes([u, v], "twin_reduction")
-                    reduced[u] = new_node
-                    reduced[v] = new_node
-                
-            else: self.operations['twin_reduction'] += 1 # cost of iterating
+
+        for group_nodes in groups.values():
+            if len(group_nodes) > 1: # worth comparing now
+                while group_nodes:
+                    u = group_nodes.pop()
+                    to_reduce = [u]
+                    u_neighbors = set(self.graph.neighbors(u))
+                    for v in group_nodes:
+                        self.operations['twin_reduction'] += max(self.graph.degree(u), self.graph.degree(v))
+                        if u_neighbors == set(self.graph.neighbors(v)):
+                            to_reduce.append(v)
+                    if len(to_reduce) > 1:
+                        all_reductions.append(to_reduce)
+                        group_nodes -= set(to_reduce)
+
+        for reduction in all_reductions:
+            self.contract_nodes(reduction, "twin_reduction")
+
+
 
     def path_compression(self):
         '''
@@ -220,17 +229,20 @@ class preMETIS:
         '''
         Eliminates all degree-2 nodes from the graph 
         This is an approximate reduction
-        O(n) for iterating through the nodes
+        O(n^2) for iterating through the nodes recursively
         '''
 
-        self.operations['degree_2_elimination'] += self.graph.number_of_nodes() # cost of iterating through nodes
-
-        for node in list(self.graph.nodes()):
-            if self.graph.degree(node) == 2:
-                neighbors = list(self.graph.neighbors(node))
-                if not self.graph.has_edge(neighbors[0], neighbors[1]):
-                    self.graph.add_edge(neighbors[0], neighbors[1])
-                self.eliminate_node(node, 'degree_2_elimination')
+        changed = True
+        while changed:
+            changed = False
+            for node in list(self.graph.nodes()):
+                self.operations['degree_2_elimination'] += 1
+                if self.graph.degree(node) == 2:
+                    neighbors = list(self.graph.neighbors(node))
+                    if not self.graph.has_edge(neighbors[0], neighbors[1]):
+                        self.graph.add_edge(neighbors[0], neighbors[1])
+                    self.eliminate_node(node, 'degree_2_elimination')
+                    changed = True 
 
     def triangle_contraction(self):
         '''

@@ -16,14 +16,17 @@ def load_results(path="results"):
 
 
 def plot_runtime_vs_reductions_per_graph(results, graphs, tests):
-    
-    for graph in graphs:
-        graph_df = results[results['graph'] == graph].copy()
+    num_graphs = len(graphs)
+    fig, axes = plt.subplots(nrows=1, ncols=num_graphs, figsize=(10 * num_graphs, 6), sharey=False)
 
-        # Set test as ordered category
+    if num_graphs == 1:
+        axes = [axes]  # Make it iterable
+
+    for ax1, graph in zip(axes, graphs):
+        graph_df = results[results['graph'] == graph].copy()
         graph_df['test'] = pd.Categorical(graph_df['test'], categories=tests, ordered=True)
 
-        # Prepare runtime values (expand 10 runtimes into rows)
+        # Expand runtime values
         expanded = []
         for _, row in graph_df.iterrows():
             for rt in row["METIS_runtimes"]:
@@ -35,24 +38,23 @@ def plot_runtime_vs_reductions_per_graph(results, graphs, tests):
         runtime_df = pd.DataFrame(expanded)
         runtime_df['test'] = pd.Categorical(runtime_df['test'], categories=tests, ordered=True)
 
-        # Plot
-        fig, ax1 = plt.subplots(figsize=(10, 6))
-
+        # Plot runtime as boxplot + stripplot
         sns.boxplot(data=runtime_df, x='test', y='runtime', ax=ax1, color='lightblue')
         sns.stripplot(data=runtime_df, x='test', y='runtime', ax=ax1, color='black', size=3, jitter=True)
         ax1.set_ylabel("Runtime (s)")
         ax1.set_xlabel("Preprocessing Method")
-        ax1.set_title(f"METIS Runtime Distribution and Total Reductions for {graph}")
+        ax1.set_title(f"{graph}")
 
-        # Secondary axis for reductions
+        # Twin axis for reductions
         ax2 = ax1.twinx()
         red_means = graph_df.set_index('test').loc[tests]['Total_Reductions']
         ax2.plot(tests, red_means.values, color='gray', marker='o', linewidth=2, label='Total Reductions')
         ax2.set_ylabel("Total Reductions", color='gray')
         ax2.tick_params(axis='y', labelcolor='gray')
 
-        fig.tight_layout()
-        plt.show()
+    fig.suptitle("METIS Runtime Distribution and Total Reductions", fontsize=16)
+    fig.tight_layout(rect=[0, 0.03, 1, 0.95])  # Adjust layout to include title
+    plt.show()
 
 def plot_operation_flamegraph(df, tests, graphs):
     # Filter the dataframe for the preMETIS tests
